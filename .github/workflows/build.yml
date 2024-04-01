@@ -1,53 +1,52 @@
-name: Build memos
+name: Build Memos
 
 on: workflow_dispatch
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-    name: Build
+    name: Build Memos
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-        
-      - name: Build Memos
-        uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          release: 13.2
-          prepare: |
-            pkg install -y node wget curl git go121 gcc bash gawk gsed
-            ln -s /usr/local/bin/go121 /usr/local/bin/go
-          run: |
-            export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-            git clone -b $LATEST_APP https://github.com/usememos/memos
+    - uses: actions/checkout@v4
+    - name: Build Memos
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        release: 13.2
+        prepare: |
+          pkg install -y node wget curl git go121 gcc bash gawk gsed
+          ln -s /usr/local/bin/go121 /usr/local/bin/go
+        run: |
+          export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
+          git clone -b $LATEST_APP https://github.com/usememos/memos
+          cd memos/public && wget https://github.com/usememos/memos-web/releases/latest/download/dist.tar.gz && tar xzf dist.tar.gz && rm dist.tar.gz
+          cd ..
+          bash ../build.sh
+          
+    - name: Upload artifact
+      uses: actions/upload-artifact@main
+      with:
+        name: memos-freebsd
+        path: |
+            memos/memos
 
-      - name: Check Artifact Directory
-        run: ls memos
-      
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: memos-freebsd
-          path: memos
-      
-      - name: Generate Release Tag
-        id: tag
-        run: echo "release_tag=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')" >> $GITHUB_OUTPUT
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.tag.outputs.release_tag }}
-          files: |
-            memos
-      
-      - name: Delete Workflow Runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 8
+    - name: Generate release tag
+      id: tag
+      run: echo "release_tag=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')" >> $GITHUB_OUTPUT
+
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        files: |
+              memos/memos
+              
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 1
+        keep_minimum_runs: 8
