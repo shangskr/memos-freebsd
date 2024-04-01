@@ -1,6 +1,7 @@
 name: Build Memos
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -9,7 +10,18 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
-        
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+          check-latest: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14.x'
+
       - name: Build Memos
         run: |
           export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
