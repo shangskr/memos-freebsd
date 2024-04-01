@@ -1,32 +1,37 @@
-name: Build Memos
+name: Build Memos for FreeBSD
 
 on: workflow_dispatch
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     name: Build Memos
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout Memos Repository
+      uses: actions/checkout@v4
+      
+    - name: Install Required Dependencies
+      run: |
+        sudo pkg install -y node wget curl git go121 gcc bash gawk gsed
+        sudo ln -s /usr/local/bin/go121 /usr/local/bin/go
+      
     - name: Build Memos
-      uses: vmactions/freebsd-vm@v1
-      with:
-        usesh: true
-        release: 13.2
-        prepare: |
-          pkg install -y node wget curl git go121 gcc bash gawk gsed
-          ln -s /usr/local/bin/go121 /usr/local/bin/go
-        run: |
-          export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-          git clone -b $LATEST_APP https://github.com/usememos/memos
-          # 根据您的项目具体情况执行构建步骤
-          
-    - name: Upload artifact
-      uses: actions/upload-artifact@main
+      run: |
+        export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
+        git clone -b $LATEST_APP https://github.com/usememos/memos
+        cd memos/public && wget https://github.com/usememos/memos-web/releases/latest/download/dist.tar.gz && tar xzf dist.tar.gz && rm dist.tar.gz
+        cd ..
+        bash ../build.sh
+        go build -o memos
+      
+    - name: Check Artifact Directory
+      run: ls memos
+      
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v2
       with:
         name: memos-freebsd
-        path: |
-            memos/memos
+        path: memos/memos
 
     - name: Generate release tag
       id: tag
