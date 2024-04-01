@@ -25,7 +25,7 @@ jobs:
 
       - name: Make Memos-Web
         run: |
-            export LATEST_APP=v0.18.2
+            export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | grep '"name":' | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
             git clone --branch $LATEST_APP https://github.com/usememos/memos.git memos
             cd memos/web
             npm install -g pnpm
@@ -50,13 +50,13 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: Memos-FreeBSD
+          name: Memos-FreeBSD-${{ env.LATEST_APP }}
           path: |
               memos/memos-freebsd
 
       - name: Generate release tag
         id: tag
-        run: echo "release_tag=v0.18.2" >> $GITHUB_ENV
+        run: echo "release_tag=${LATEST_APP}" >> $GITHUB_ENV
 
       - name: Create release
         uses: softprops/action-gh-release@v1
