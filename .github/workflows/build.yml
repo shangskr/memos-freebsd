@@ -1,55 +1,64 @@
-name: Build Memos for FreeBSD
+name: Build and Release Memos for FreeBSD
 
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-    name: Build Memos
+    name: Build and Release Memos
     steps:
-    - name: Checkout Memos Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        
+      - name: Install Required Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nodejs wget curl git golang gcc bash gawk sed
+          # Install Go
+          wget https://golang.org/dl/go1.17.6.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.17.6.linux-amd64.tar.gz
+          rm go1.17.6.linux-amd64.tar.gz
+          # Set Go environment variable
+          echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+        
+      - name: Build Memos
+        run: |
+          export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
+          git clone -b $LATEST_APP https://github.com/usememos/memos
+          cd memos/public && wget https://github.com/usememos/memos-web/releases/latest/download/dist.tar.gz && tar xzf dist.tar.gz && rm dist.tar.gz
+          cd ..
+          # Replace this line with your actual build command if you have one
+          npm install && npm run build && go build -o memos
+        
+      - name: Check Artifact Directory
+        run: ls memos
       
-    - name: Install Required Dependencies
-      run: |
-        sudo pkg install -y node wget curl git go121 gcc bash gawk gsed
-        sudo ln -s /usr/local/bin/go121 /usr/local/bin/go
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: memos-freebsd
+          path: memos/memos
       
-    - name: Build Memos
-      run: |
-        export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-        git clone -b $LATEST_APP https://github.com/usememos/memos
-        cd memos/public && wget https://github.com/usememos/memos-web/releases/latest/download/dist.tar.gz && tar xzf dist.tar.gz && rm dist.tar.gz
-        cd ..
-        bash ../build.sh
-        go build -o memos
+      - name: Generate Release Tag
+        id: tag
+        run: echo "release_tag=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')" >> $GITHUB_ENV
       
-    - name: Check Artifact Directory
-      run: ls memos
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          files: |
+            memos/memos
       
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: memos-freebsd
-        path: memos/memos
-
-    - name: Generate release tag
-      id: tag
-      run: echo "release_tag=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')" >> $GITHUB_OUTPUT
-
-    - name: Create release
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        files: |
-              memos/memos
-              
-    - name: Delete workflow runs
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        token: ${{ github.token }}
-        repository: ${{ github.repository }}
-        retain_days: 1
-        keep_minimum_runs: 8
+      - name: Delete Workflow Runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 8
