@@ -23,16 +23,15 @@ jobs:
           rm go1.17.6.linux-amd64.tar.gz
           # Set Go environment variable
           echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-        
+      
       - name: Build Memos
         run: |
           export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
           git clone -b $LATEST_APP https://github.com/usememos/memos
-          cd memos/public && wget https://github.com/usememos/memos-web/releases/latest/download/dist.tar.gz && tar xzf dist.tar.gz && rm dist.tar.gz
-          cd ..
+          cd memos
           # Replace this line with your actual build command if you have one
           npm install && npm run build && go build -o memos
-        
+      
       - name: Check Artifact Directory
         run: ls memos
       
@@ -40,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: memos-freebsd
-          path: memos/memos
+          path: memos
       
       - name: Generate Release Tag
         id: tag
@@ -53,7 +52,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
           files: |
-            memos/memos
+            memos
       
       - name: Delete Workflow Runs
         uses: Mattraks/delete-workflow-runs@v2
