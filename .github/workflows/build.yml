@@ -1,57 +1,70 @@
-name: Build Memos
+name: Build
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
   build:
     runs-on: ubuntu-latest
     name: Build
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 'stable'
-          check-latest: true
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 'stable'
+        check-latest: true
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '14.x'
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
 
-      - name: Build Memos
-        run: |
-          export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-          git clone -b $LATEST_APP https://github.com/usememos/memos
-          cd memos && npm install -g pnpm && corepack enable && pnpm i --frozen-lockfile && pnpm build && cd ..
-          GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -o memos ./memos/bin/memos/main.go && mkdir -p memos-artifact && cp memos memos-artifact/memos && cd memos-artifact && tar -czvf memos-freebsd-amd64.tar.gz memos && cd ..
+    - name: Clone Repo
+      run: |
+        export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
+        git clone -b $LATEST_APP https://github.com/usememos/memos
+        npm install -g pnpm
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: memos-pre-built
-          path: memos/memos-artifact/memos-freebsd-amd64.tar.gz
+    - name: Build Frontend
+      run: |
+        cd memos/web
+        corepack enable && pnpm i --frozen-lockfile
+        pnpm build
+        mkdir -p ../artifact
+        mv -f dist ../artifact/dist
+        cd ../..
 
-      - name: Generate release tag
-        id: tag
-        run: echo "release_tag=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')" >> $GITHUB_ENV
-
-      - name: Create release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.tag.outputs.release_tag }}
-          files: |
+    - name: Build binary
+      run: |
+        cd memos
+        GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -o memos ./bin/memos/main.go && rm -f artifact/memos && cp memos artifact/memos && cd artifact && tar -czvf ../memos-freebsd-amd64.tar.gz * && cd ..
+        cd ..
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@main
+      with:
+        name: memos-pre-built
+        path: |
             memos/memos-freebsd-amd64.tar.gz
+            
+    - name: Generate release tag
+      id: tag
+      run: echo "release_tag=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')" >> $GITHUB_OUTPUT
 
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 8
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        files: |
+            memos/memos-freebsd-amd64.tar.gz
+              
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 1
+        keep_minimum_runs: 8
