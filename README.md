@@ -1,4 +1,4 @@
-# synctv-freebsd
-Automatically build synctv (FreeBSD version)
-基于freebsd系统构建的synctv
+# Memos-freebsd
+Automatically build Memos (FreeBSD version)
+基于freebsd系统构建的Memos
 愉快的部署吧！
