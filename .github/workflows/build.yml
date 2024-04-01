@@ -11,26 +11,17 @@ jobs:
         uses: actions/checkout@v2
         
       - name: Build Memos
-        uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          release: 13.2
-          prepare: |
-            pkg install -y node wget curl git go121 gcc bash gawk gsed
-            ln -s /usr/local/bin/go121 /usr/local/bin/go
-          run: |
-            export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-            git clone -b $LATEST_APP https://github.com/usememos/memos
-            cd memos/public && wget https://github.com/usememos/memos/releases/latest/download/dist.tar.gz && tar xzf dist.tar.gz && rm dist.tar.gz
-            cd ..
-            bash ../build.sh
-            
+        run: |
+          export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
+          git clone -b $LATEST_APP https://github.com/usememos/memos
+          cd memos && npm install -g pnpm && corepack enable && pnpm i --frozen-lockfile && pnpm build && cd ..
+          GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -o memos ./memos/bin/memos/main.go && mkdir -p memos-artifact && cp memos memos-artifact/memos && cd memos-artifact && tar -czvf memos-freebsd-amd64.tar.gz memos && cd ..
+
       - name: Upload artifact
         uses: actions/upload-artifact@main
         with:
-          name: memos-freebsd
-          path: |
-            memos/memos
+          name: memos-pre-built
+          path: memos/memos-artifact/memos-freebsd-amd64.tar.gz
 
       - name: Generate release tag
         id: tag
@@ -43,7 +34,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
           files: |
-            memos/memos
+            memos/memos-freebsd-amd64.tar.gz
 
       - name: Delete workflow runs
         uses: Mattraks/delete-workflow-runs@v2
