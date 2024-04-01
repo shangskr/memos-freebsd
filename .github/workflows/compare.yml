@@ -1,4 +1,4 @@
-name: Run Tests
+name: Check Updates
 
 on:
   schedule:
@@ -13,7 +13,7 @@ jobs:
       - name: compare versions
         run: |
           export REMOTEVERSION=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-          export LOCALVERSION=$(curl --location --silent --fail --show-error "https://api.github.com/repos/usememos/memos/releases/latest" | grep -oP '"tag_name":\s*"\K[^"]+')
+          export LOCALVERSION=$(curl --location --silent --fail --show-error "https://api.github.com/repos/shangskr/memos-freebsd/releases/latest" | grep -oP '"tag_name":\s*"\K[^"]+')
           bash compare.sh
           
       - name: Trigger release
@@ -23,8 +23,8 @@ jobs:
           github-token: ${{ secrets.PAT_TOKEN }}
           script: |
               await github.rest.actions.createWorkflowDispatch({
-              owner: 'usememos',
-              repo: 'memos',
+              owner: 'shangskr',
+              repo: 'memos-freebsd',
               workflow_id: 'build.yml',
               ref: 'main'
               })
