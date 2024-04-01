@@ -13,25 +13,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
         
-      - name: Install Required Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y nodejs wget curl git golang gcc bash gawk sed
-          # Install Go
-          wget https://golang.org/dl/go1.17.6.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go1.17.6.linux-amd64.tar.gz
-          rm go1.17.6.linux-amd64.tar.gz
-          # Set Go environment variable
-          echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-      
       - name: Build Memos
-        run: |
-          export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
-          git clone -b $LATEST_APP https://github.com/usememos/memos
-          cd memos
-          # Replace this line with your actual build command if you have one
-          npm install && npm run build && go build -o memos
-      
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          release: 13.2
+          prepare: |
+            pkg install -y node wget curl git go121 gcc bash gawk gsed
+            ln -s /usr/local/bin/go121 /usr/local/bin/go
+          run: |
+            export LATEST_APP=$(wget -qO- https://api.github.com/repos/usememos/memos/tags | gawk -F '["v]' '/name/{print "v"$5;exit}')
+            git clone -b $LATEST_APP https://github.com/usememos/memos
+
       - name: Check Artifact Directory
         run: ls memos
       
